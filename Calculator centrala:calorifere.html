@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculator încălzire electrică & PV (1-la-1)</title>
+<style>
+  /* === THEME TOKENS === */
+  :root{
+    --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --border:rgba(255,255,255,0.10);
+    --row:#1f2937; --row-soft:rgba(17,24,39,.55); --field:#0b1220; --readonly:#0b1220; --readonly-border:rgba(34,211,238,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f4f6; --card:#ffffff; --muted:#4b5563; --text:#0b1020; --accent:#0ea5e9; --border:rgba(0,0,0,0.1);
+    --row:#f3f4f6; --row-soft:#f7fafc; --field:#ffffff; --readonly:#f8feff; --readonly-border:rgba(14,165,233,.45);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial;
+    background:var(--bg);
+    color:var(--text);
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+
+  /* === HEADER === */
+  .app-header{
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px;
+    padding:12px clamp(12px, 3vw, 28px);
+    border-bottom:1px solid var(--border);
+    background:var(--card);
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .brand h1{font-size:1.05rem; margin:0}
+  .logo{
+    width:36px; height:36px; border-radius:8px; display:inline-block;
+    background:linear-gradient(135deg, var(--accent), transparent 60%), var(--row);
+    border:1px solid var(--border);
+    position:relative;
+  }
+  .logo svg{position:absolute; inset:0; width:100%; height:100%}
+
+  .header-actions{display:flex; gap:10px; align-items:center}
+  button{cursor:pointer; border:none; padding:8px 12px; border-radius:10px; font-weight:600}
+  .btn{background:#0ea5e9; color:#fff}
+  .btn.secondary{background:#1f2937; color:#fff}
+  [data-theme="light"] .btn.secondary{background:#e5e7eb; color:#111827}
+
+  /* === MAIN – FULL WIDTH === */
+  .wrap{width:100%; margin:0; padding:0; flex:1}
+  .card{
+    width:100%;
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    background-color:var(--card);
+    border:1px solid var(--border);
+    border-radius:0;
+    padding:12px clamp(12px, 3vw, 28px);
+    box-shadow:0 10px 30px rgba(0,0,0,0.12);
+    border-top:none;
+  }
+
+  table{width:100%; border-collapse:separate; border-spacing:0 8px;}
+  thead th{font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); text-align:left; padding:8px}
+  tbody td{background:var(--row-soft); border:1px solid var(--border); border-left:none; border-right:none; padding:10px}
+  tbody tr td:first-child{border-radius:10px 0 0 10px; border-left:1px solid var(--border)}
+  tbody tr td:last-child{border-radius:0 10px 10px 0; border-right:1px solid var(--border)}
+  input, select{width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.14); background:var(--field); color:inherit; outline:none}
+  [data-theme="light"] input,[data-theme="light"] select{border-color:rgba(0,0,0,.12)}
+  input[readonly]{background:var(--readonly); color:inherit; border-color:var(--readonly-border)}
+  .row-actions{display:flex; gap:8px; align-items:center; justify-content:flex-end}
+  .right{text-align:right}
+  .narrow{max-width:140px}
+
+  .totals{display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; color:var(--text)}
+  .pill{background:var(--field); border:1px solid var(--border); padding:8px 10px; border-radius:999px; font-variant-numeric:tabular-nums}
+
+  .footer{
+    width:100%;
+    background:var(--card);
+    border-top:1px solid var(--border);
+    color:var(--muted);
+    font-size:12px;
+    padding:10px clamp(12px, 3vw, 28px);
+    text-align:center;
+  }
+
+  .kbd{font:600 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background:var(--field); border:1px solid var(--border); padding:.15rem .35rem; border-radius:6px}
+  tr:focus-within{outline:2px solid var(--accent); outline-offset:2px; border-radius:12px}
+
+  /* === Print: doar tabelul curat === */
+  #printZone{display:none}
+  @media print{
+    body{background:white}
+    .app-header, .footer, .card{border:none; box-shadow:none}
+    .no-print{display:none !important}
+    #printZone{display:block !important; padding:0 8mm}
+    #printZone table{width:100%; border-collapse:collapse; border-spacing:0}
+    #printZone thead th, #printZone td{border:1px solid #444; padding:6px 8px; font-size:12px; color:#000; background:#fff}
+    #printZone thead th{font-weight:700; text-transform:none; letter-spacing:normal}
+    @page{size:A4 portrait; margin:10mm}
+  }
+</style>
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="brand">
+      <!-- Logo simplu (înlocuiește cu <img src="logo.png" alt="..."> dacă ai un fișier) -->
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 12a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" opacity=".4"/>
+          <path d="M6 12a6 6 0 0 1 12 0" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+        </svg>
+      </span>
+      <h1>Calculator încălzire electrică &amp; PV (1-la-1)</h1>
+    </div>
+    <div class="header-actions no-print">
+      <button class="btn secondary" id="themeToggle">🌙 / ☀️</button>
+      <button class="btn" id="exportPdf">Export PDF (tabel)</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="wrap">
+    <div class="card">
+      <table id="calcTable" aria-label="Calculator încălzire electrică și PV">
+        <thead>
+          <tr>
+            <th>Locație</th>
+            <th class="right">Suprafață<br>(m²)</th>
+            <th class="right">Înălțime<br>(m)</th>
+            <th class="right">Factor termic<br>(W/m³)</th>
+            <th class="right">Tip echipament</th>
+            <th class="right">Marjă<br>(%)</th>
+            <th class="right">kW<sub>th</sub></th>
+            <th class="right">kW<sub>el</sub></th>
+            <th class="right">kWp PV</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="body"></tbody>
+      </table>
+
+      <div class="totals" id="totals">
+        <div class="pill">Σ kW<sub>th</sub>: <span id="sumTh">0.00</span></div>
+        <div class="pill">Σ kW<sub>el</sub>: <span id="sumEl">0.00</span></div>
+        <div class="pill">Σ kWp PV: <span id="sumPv">0.00</span></div>
+      </div>
+
+      <!-- Zonă de print generată dinamic (tabel curat, fără input-uri) -->
+      <div id="printZone"></div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    © <span id="y"></span> Mihai Căzan | CRC Energy
+  </footer>
+
+<script>
+(function(){
+  // === YEAR IN FOOTER
+  document.getElementById('y').textContent = new Date().getFullYear();
+
+  // === THEME: persist pe localStorage ===
+  const LS_KEY = 'calc_theme';
+  const root = document.documentElement;
+  function applyTheme(t){ root.setAttribute('data-theme', t); localStorage.setItem(LS_KEY, t); }
+  const saved = localStorage.getItem(LS_KEY);
+  if(saved){ applyTheme(saved); }
+  document.getElementById('themeToggle').addEventListener('click', ()=>{
+    const next = (root.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+    applyTheme(next);
+  });
+
+  // === TABLE LOGIC ===
+  const body = document.getElementById('body');
+  const sumThEl = document.getElementById('sumTh');
+  const sumElEl = document.getElementById('sumEl');
+  const sumPvEl = document.getElementById('sumPv');
+
+  function fmt(x){ return (isFinite(x) ? Number(x).toFixed(2) : ''); }
+  function marginByType(type){ return type === 'calorifere' ? 7 : 0; } // centrală=0%, calorifere=7%
+
+  function rowTemplate(values={}){
+    const {
+      loc='',
+      area='',
+      h=3,           // implicit 3 m
+      factor=30,     // implicit 30 W/m3
+      type='centrala'
+    } = values;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input placeholder="Ex: Hala A" value="${loc}" aria-label="Locație"></td>
+      <td class="right"><input type="number" step="0.01" min="0" value="${area}" class="narrow" aria-label="Suprafață (m²)"></td>
+      <td class="right"><input type="number" step="0.01" min="0" value="${h}" class="narrow" aria-label="Înălțime (m)"></td>
+      <td class="right"><input type="number" step="1" min="0" value="${factor}" class="narrow" aria-label="Factor termic (W/m³)"></td>
+      <td class="right">
+        <select class="narrow sel-type" aria-label="Tip echipament">
+          <option value="centrala" ${type==='centrala'?'selected':''}>Centrală electrică</option>
+          <option value="calorifere" ${type==='calorifere'?'selected':''}>Calorifere electrice</option>
+        </select>
+      </td>
+      <td class="right"><input type="number" step="1" min="0" class="narrow inp-margin" readonly></td>
+      <td class="right"><input type="text" readonly></td>
+      <td class="right"><input type="text" readonly></td>
+      <td class="right"><input type="text" readonly></td>
+      <td class="row-actions">
+        <button class="btn secondary btn-dup" title="Duplică rând (Ctrl/Cmd+D)">Duplică</button>
+        <button class="btn secondary btn-del" title="Șterge rând" style="background:#ef4444">Șterge</button>
+      </td>
+    `;
+    attachRowLogic(tr);
+    computeRow(tr);
+    return tr;
+  }
+
+  function computeRow(tr){
+    const tds = tr.querySelectorAll('td');
+    const area = parseFloat(tds[1].querySelector('input').value) || 0;
+    const h    = parseFloat(tds[2].querySelector('input').value) || 0;
+    const f    = parseFloat(tds[3].querySelector('input').value) || 0;
+    const type = tds[4].querySelector('select').value;
+
+    const margin = marginByType(type);
+    const marginInput = tds[5].querySelector('input');
+    if (parseFloat(marginInput.value) !== margin) marginInput.value = margin;
+
+    const kw_th = (area * h * f) / 1000;
+    const kw_el = kw_th * (1 + margin/100);
+    const kw_pv = kw_el;
+
+    tds[6].querySelector('input').value = fmt(kw_th);
+    tds[7].querySelector('input').value = fmt(kw_el);
+    tds[8].querySelector('input').value = fmt(kw_pv);
+
+    computeTotals();
+  }
+
+  function computeTotals(){
+    let sumTh=0, sumEl=0, sumPv=0;
+    [...body.querySelectorAll('tr')].forEach(tr=>{
+      const th = parseFloat(tr.children[6].querySelector('input').value) || 0;
+      const el = parseFloat(tr.children[7].querySelector('input').value) || 0;
+      const pv = parseFloat(tr.children[8].querySelector('input').value) || 0;
+      sumTh += th; sumEl += el; sumPv += pv;
+    });
+    sumThEl.textContent = fmt(sumTh);
+    sumElEl.textContent = fmt(sumEl);
+    sumPvEl.textContent = fmt(sumPv);
+  }
+
+  function focusRow(tr){ tr.querySelector('input,select')?.focus(); }
+
+  function getRowFromChild(el){
+    return el?.closest('tr') || document.activeElement?.closest?.('tr') || body.querySelector('tr:last-child');
+  }
+
+  function attachRowLogic(tr){
+    tr.addEventListener('input', (e)=>{
+      if(e.target.tagName==='INPUT' || e.target.tagName==='SELECT'){ computeRow(tr); }
+    });
+    // Autocomplet tip: c/f când selectul are focus
+    const sel = tr.querySelector('.sel-type');
+    sel.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase()==='c'){ sel.value='centrala'; e.preventDefault(); computeRow(tr); }
+      if(e.key.toLowerCase()==='f'){ sel.value='calorifere'; e.preventDefault(); computeRow(tr); }
+    });
+
+    tr.querySelector('.btn-del').addEventListener('click', ()=>{
+      tr.remove(); computeTotals();
+    });
+    tr.querySelector('.btn-dup').addEventListener('click', ()=>{
+      const inputs = tr.querySelectorAll('input, select');
+      const vals = {
+        loc: inputs[0].value,
+        area: inputs[1].value,
+        h: inputs[2].value,
+        factor: inputs[3].value,
+        type: inputs[4].value
+      };
+      const newRow = rowTemplate(vals);
+      body.appendChild(newRow);
+      focusRow(newRow);
+    });
+
+    // Ștergere rapidă din tastatură
+    tr.addEventListener('keydown', (e)=>{
+      if((e.key==='Delete' || e.key==='Backspace') && e.ctrlKey===false && e.metaKey===false){
+        if(document.activeElement && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+        e.preventDefault();
+        const next = tr.nextElementSibling || tr.previousElementSibling;
+        tr.remove(); computeTotals();
+        if(next) focusRow(next);
+      }
+    });
+  }
+
+  // === Global shortcuts ===
+  document.addEventListener('keydown', (e)=>{
+    const isCmd = e.metaKey || e.ctrlKey;
+    // Add row: Ctrl/Cmd + Enter
+    if(isCmd && e.key === 'Enter'){
+      e.preventDefault();
+      const r = rowTemplate({});
+      body.appendChild(r); focusRow(r);
+    }
+    // Duplicate current row: Ctrl/Cmd + D
+    if(isCmd && (e.key.toLowerCase() === 'd')){
+      const row = getRowFromChild(document.activeElement);
+      if(row){
+        e.preventDefault();
+        row.querySelector('.btn-dup')?.click();
+      }
+    }
+  });
+
+  // === Export PDF (doar tabel) ===
+  function buildPrintableTable(){
+    const srcTable = document.getElementById('calcTable');
+    const clone = document.createElement('table');
+    clone.style.width = '100%';
+    const thead = document.createElement('thead');
+    const trHead = document.createElement('tr');
+    const headers = ["Locație","Suprafață (m²)","Înălțime (m)","Factor (W/m³)","Tip echipament","Marjă (%)","kWth","kWel","kWp PV"];
+    headers.forEach(h=>{
+      const th = document.createElement('th');
+      th.textContent = h;
+      trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+    clone.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    [...srcTable.querySelectorAll('tbody tr')].forEach(row=>{
+      const tds = row.querySelectorAll('td');
+      if(!tds.length) return;
+      const tr = document.createElement('tr');
+      const vals = [
+        tds[0].querySelector('input')?.value ?? '',
+        tds[1].querySelector('input')?.value ?? '',
+        tds[2].querySelector('input')?.value ?? '',
+        tds[3].querySelector('input')?.value ?? '',
+        tds[4].querySelector('select')?.selectedOptions[0]?.textContent ?? '',
+        tds[5].querySelector('input')?.value ?? '',
+        tds[6].querySelector('input')?.value ?? '',
+        tds[7].querySelector('input')?.value ?? '',
+        tds[8].querySelector('input')?.value ?? ''
+      ];
+      vals.forEach(v=>{
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    clone.appendChild(tbody);
+    return clone;
+  }
+
+  document.getElementById('exportPdf').addEventListener('click', ()=>{
+    const zone = document.getElementById('printZone');
+    zone.innerHTML = ''; // doar tabelul (fără titluri)
+    const tbl = buildPrintableTable();
+    zone.appendChild(tbl);
+    window.print();
+  });
+
+  // Rând inițial + calc inițial
+  body.appendChild(rowTemplate({ loc:'Exemplu – Hala A', area:600, h:3, factor:30, type:'centrala' }));
+  [...body.querySelectorAll('tr')].forEach(computeRow);
+  computeTotals();
+})();
+</script>
+</body>
+</html>
